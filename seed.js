@@ -19,12 +19,26 @@ const checkDatabaseName = () => {
   }
 };
 
+// ===========WAIT HELPER===========
+// Pauses for a few milliseconds. The API sends error 429 if I ask too fast.
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // ===========GET ONE PAGE FROM THE API===========
+// If I get a 429, I wait and try the same page again (up to 5 tries in total).
 const fetchPage = async (url) => {
-  // Give up after 10 seconds so it doesn't hang
-  const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
-  if (!response.ok) throw new Error(`Rick and Morty API error: ${response.status}`);
-  return response.json();
+  for (let tries = 1; tries <= 5; tries++) {
+    // Give up after 10 seconds so it doesn't hang
+    const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+
+    if (response.status === 429 && tries < 5) {
+      console.log(`Too many requests, waiting before try ${tries + 1}...`);
+      await wait(tries * 2000);
+      continue;
+    }
+
+    if (!response.ok) throw new Error(`Rick and Morty API error: ${response.status}`);
+    return response.json();
+  }
 };
 
 // ===========API DATA -> MY MODEL===========
@@ -54,6 +68,8 @@ const seed = async () => {
       characters.push(...data.results.map(toCharacter));
       console.log(`Got ${characters.length} of ${data.info.count} characters`);
       url = data.info.next;
+      // Short pause between pages so I don't hit the limit
+      await wait(500);
     }
 
     // I clear the old characters AFTER the fetch works, so a failed fetch doesn't leave it empty
@@ -62,6 +78,8 @@ const seed = async () => {
     console.log(`Saved ${characters.length} characters to rickAndMortyDB`);
   } catch (error) {
     console.log("Seed failed:", error.message);
+    // fetch hides the real network problem in error.cause (like no internet or a blocked site)
+    if (error.cause) console.log("Reason:", error.cause.message || error.cause);
     process.exitCode = 1;
   } finally {
     await mongoose.disconnect();
