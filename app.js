@@ -1,5 +1,6 @@
 // ===========EXPRESS APP===========
 const express = require("express");
+const characterRoutes = require("./routes/characterRoutes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
@@ -15,6 +16,8 @@ app.use((req, res, next) => {
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to my Rick and Morty API" });
 });
+
+app.use("/api/characters", characterRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
